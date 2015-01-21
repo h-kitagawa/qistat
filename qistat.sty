@@ -11,9 +11,6 @@
 %%% \QIinit<name>
 \def\QIinit#1{\expandafter\def\csname qil@#1\endcsname{}}
 
-%%% \QIrecalc<name>
-\def\QIrecalc#1{\qi@recalc{#1}}
-
 %%% \QIappend<name><data>
 \def\QIappend{%
   \@ifstar{\@qi@recalcfalse\QIappend@}{\@qi@recalctrue\QIappend@}}
@@ -58,7 +55,6 @@
     \qi@temp}%
   \expandafter\def\csname qi#1\endcsname##1{\csname qil#2@##1\endcsname}}
 
-\qi@make{cnt}{C}
 \qi@make{sum}{SU}
 \qi@make{avg}{A}
 \qi@make{var}{V}
@@ -69,6 +65,10 @@
 \qi@make{iqr}{IQ}
 \qi@make{min}{MI}
 \qi@make{max}{MA}
+\qi@make{mode}{O}
+
+\def\QImodemult#1{\csname qilOM@#1\endcsname}
+\def\QIcnt#1{\csname qilC@#1\endcsname}
 
 \def\qiout#1{{%
   \@tempswafalse
@@ -87,11 +87,11 @@
 \def\qi@pop#1#2{\expandafter\qi@pop@#2\@nil#1#2}
 \def\qi@pop@\@elt#1#2\@nil#3#4{\def#3{#1}\def#4{#2}}
 \def\qicov@#1#2{%
-  \ifnum\qicnt{#1}=\qicnt{#2}\relax
-    \ifnum\qicnt{#1}=\z@
+  \ifnum\QIcnt{#1}=\QIcnt{#2}\relax
+    \ifnum\QIcnt{#1}=\z@
       \FPclip\@tempfpe{0}
     \else
-      \@tempcnta=\qicnt{#1}\FPset\@tempfpe{0}%
+      \@tempcnta=\QIcnt{#1}\FPset\@tempfpe{0}%
       \edef\@tempfpa{\qiavg{#1}}\edef\@qitempa{\csname qil@#1\endcsname}
       \edef\@tempfpb{\qiavg{#2}}\edef\@qitempb{\csname qil@#2\endcsname}
       \loop
@@ -102,7 +102,7 @@
         \FPmul\@tempfpc\@tempfpc\@tempfpd
         \FPadd\@tempfpe\@tempfpe\@tempfpc
       \repeat
-      \FPdiv\@tempfpe\@tempfpe{\qicnt{#1}}
+      \FPdiv\@tempfpe\@tempfpe{\QIcnt{#1}}
       \FPclip\@tempfpe\@tempfpe
     \fi
   \else
@@ -115,8 +115,8 @@
 
 %%% 相関係数
 \def\qipcc@#1#2{%
-  \ifnum\qicnt{#1}=\qicnt{#2}\relax
-    \ifnum\qicnt{#1}=\z@
+  \ifnum\QIcnt{#1}=\QIcnt{#2}\relax
+    \ifnum\QIcnt{#1}=\z@
       \FPclip\@tempfpe{0}%
     \else
       \qicov@{#1}{#2}%
@@ -233,6 +233,10 @@
   \qi@upvalue{\qi@sort\@tempcnta\@qitemp\@qitemp}\@qitemp{\@qitemp}%
   \expandafter\let\csname qilS@#1\endcsname\@qitemp% ソート済リスト
   %
+  \qi@mode\@qitemp
+  \expandafter\FPclip\csname qilO@#1\endcsname\@tempfpa% 最頻値
+  \expandafter\edef\csname qilOM@#1\endcsname{\the\@tempcnta}%
+  %
   \qi@median\@qitemp
   \expandafter\FPclip\csname qilQ2@#1\endcsname\@tempfpa% 中央値
   \qi@upvalue{\qi@median\@qitempa}\@tempfpa{\@tempfpa}%
@@ -253,8 +257,11 @@
   }\csname qil@#1\endcsname
   \expandafter\FPclip\csname qilMI@#1\endcsname{\@tempfpa}% 最小値
   \expandafter\FPclip\csname qilMA@#1\endcsname{\@tempfpb}% 最大値
-%
+  %
   \let\@elt\relax}
+
+%%% \QIrecalc<name>
+\let\QIrecalc=\qi@recalc
 
 
 %%% ソート
@@ -308,6 +315,26 @@
     \qi@upvalue{\qi@sort\@tempcntb\@qitemp\@qis@right}\@qis@right{\@qitemp}%
     \edef#2{\@qis@left\@qis@mid\@qis@right}%
   \fi\fi}
+
+%%% 最頻値
+\def\qi@mode#1{%
+  \@tempcnta\z@\def\@tempfpa{0}%
+  \@tempcntb\z@\def\@tempfpb{0}%
+  \def\@elt##1{%
+    \@gobble\if\FPifeq\@tempfpb{##1}%
+      \advance\@tempcntb\@ne
+    \else
+      \ifnum\@tempcntb>\@tempcnta
+        \@tempcnta\@tempcntb\let\@tempfpa\@tempfpb
+      \fi
+      \@tempcntb\@ne\FPset\@tempfpb{##1}%
+    \fi
+  }%
+  \@qitemp\let\@elt\relax
+  \ifnum\@tempcntb>\@tempcnta
+    \@tempcnta\@tempcntb\let\@tempfpa\@tempfpb
+  \fi%
+}
 
 %%% 四分位数・中央値
 \def\qi@median#1{%

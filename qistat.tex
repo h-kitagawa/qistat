@@ -20,13 +20,13 @@
 
 \maketitle
 
-\begin{abstract}
+
 このパッケージは，高等学校「数学I」に出てくる各種統計量を
-\TeX の内部だけで計算するパッケージである．
+\TeX の内部だけで計算するパッケージで，
+\url{https://github.com/h-kitagawa/qistat}でひっそりと公開している．
 本来は，こういう統計処理は外部ソフトウェアを使うべきであり，
 本パッケージのように\TeX だけで行うのは\textbf{余興}の域を
 出ないであろう．
-\end{abstract}
 
 \section{動作環境}
 \TeX 本体の数値計算機能を
@@ -42,7 +42,7 @@
   万が一導入されていなければ，
   \url{http://www.ctan.org/tex-archive/macros/latex/contrib/fp/}から
   ダウンロードできる．
-}が必要である．それ以外の外部パッケージは必要ないはずである．
+}を使用している．それ以外の外部パッケージは必要ないはずである．
 なお，plain \TeX では使用できず，\LaTeXe の下で動作する．
 
 \section{命令一覧}
@@ -57,7 +57,7 @@
 \item[\cs{QIappend|name||data|}]
 内部リスト|name|の末尾に1つの値|data|を追加する．
 
-標準では，データを追加した時点で各種統計量の再計算を行う．
+標準では，データを追加した時点で次節に述べる各種統計量の再計算を行う．
 \cs{QIappend}等を複数回連続で呼び出すときは無駄になってしまうので，
 その場合は\cs{QIappend*}と末尾にアスタリスクをつけることで再計算を抑止できる．
 
@@ -78,6 +78,12 @@
 \item[\cs{QIcopy|name||newname|}]
 内部リスト|name|の内容を内部リスト|newname|にコピーする．
 コピー先の|newname|が予め宣言されている必要はない．
+
+\item[\cs{QIrecalc|name|}]
+内部リスト|name|についての次節で述べる統計量を再計算する．
+この命令は，\cs{QIconcatC*}, \cs{QIconcatI*}, \cs{QIappend*}を実行した後以外は
+明示的に実行する必要はない．
+
 \end{description}
 
 コンマ区切りリスト中に「空の項目」はあってはならない．
@@ -90,8 +96,16 @@
 のように最後にコンマを余計につけることも禁止である．
 
 \subsection{統計量の出力}
-本節の命令それぞれに対して，
-\cs{QIavg}に対して\cs{qiavg}のように
+
+\begin{description}
+\item[\cs{QIcnt}|name|]
+内部リスト|name|のデータ数
+\item[\cs{QImodemult}|name|]
+内部リスト|name|において，最頻値が何回出現しているか
+\end{description}
+
+以下の命令の結果は整数とは限らないので，
+それぞれに対して，\cs{QIavg}に対して\cs{qiavg}のように
 最初の2文字が小文字になった変種が存在する．
 両者の違いは出力フォーマットで，
 \begin{itemize}
@@ -113,14 +127,12 @@
 \QIavg{hoge}, \qiavg{hoge}」が得られる．
 
 \begin{description}
-\item[\cs{QIcnt}|name|]
-内部リスト|name|のデータ数
 \item[\cs{QIsum}|name|]
 内部リスト|name|の合計値
 \item[\cs{QIavg}|name|]
 内部リスト|name|の平均値
 \item[\cs{QIvar}|name|]
-内部リスト|name|の分散
+内部リスト|name|の分散（分母はデータ数$n$）
 \item[\cs{QIstdev}|name|]
 内部リスト|name|の標準偏差
 \item[\cs{QImedian}|name|]
@@ -135,6 +147,12 @@
 内部リスト|name|の最小値
 \item[\cs{QImax}|name|]
 内部リスト|name|の最大値
+\item[\cs{QImode}|name|]
+内部リスト|name|の最頻値（のうち最小のもの）
+\item[\cs{QImodemult}|name|]
+内部リスト|name|の最頻値が何回出現しているか
+%\item[\cs{QIpct}|name||q|]
+%内部リスト|name|の$q$パーセンタイル(\underline{p}er\underline{c}en\underline{t}ile)
 \item[\cs{QIcov}|name1||name2|]
 2つの内部リスト|name1|,~|name2|の共分散(\underline{cov}ariance)
 \item[\cs{QIpcc}|name1||name2|]
@@ -145,17 +163,26 @@
 \begin{itemize}
  \item 
 \cs{QIlqt}, \cs{QIuqt}で計算する四分位数の定義は
-文科省流のもので，
-第1四分位数は「下位のデータの中央値」，
-第3四分位数は「上位のデータの中央値」として計算する．
+（少なくとも数研出版の）教科書で採用されているものを採用している．
+具体的には，第1四分位数は「下位のデータの中央値」，
+第3四分位数は「上位のデータの中央値」として計算する%
+\footnote{Turkeyのヒンジ値というそうだ．}．
+
+%Excelのquartile関数による値と同じ計算法を用いたいならば，
+%\cs{QIpct|name|\{25\}}, \cs{QIpct|name|\{75\}}などとすること．
 
 \item 内部リスト|name|が空リストの場合でも，
 上記の命令類はエラーは返さず，適当な値となる．例えば
 \cs{QImin}, \cs{QImax}はそれぞれ
 \texttt{fp}パッケージの扱える最大値・最小値となる．
 
-\item 2つのリストから計算される\cs{QIcov}, \cs{QIpcc}\emph{以外}の統計量は，
-内部リストの変更に伴い再計算される．
+\item 本節の命令で出力される統計量は
+内部リストの変更に伴い自動的に計算されるだけであり，
+\emph{命令実行時にその都度計算されるわけではない}．
+従って，前節で述べた
+\cs{QIconcatC*}, \cs{QIconcatI*}, \cs{QIappend*}の
+3命令を用いてリストにデータを一通り追加した場合は，
+\cs{QIrecalc}を手動で実行する必要がある．
 \end{itemize}
 
 \subsection{その他}
@@ -196,7 +223,7 @@
 省略時の|height|は1である．
 \end{description}
 
-\newpage
+
 \section{例1}
 
 元データは1984--2013の熱帯夜\footnote{%
@@ -288,16 +315,17 @@
 \loop
   \stepcounter{iter}\rand
   \QIappend*{rand}{\arabic{rand}}%
-  \ifnum\value{iter}<155
+  \ifnum\value{iter}<272
 \repeat
-\QIrecalc{iter}
-
-%\paragraph{元データ}\leavevmode\par
-%\begin{quote}
-%  \qiout{rand}
-%\end{quote}
+\QIrecalc{rand}
 
 
+\begin{quote}
+  \small
+  \qiout{rand}\phantom{,}
+\end{quote}
+という\QIcnt{rand}個のデータにおける
+最頻値（のうち最小のもの）は\qimode{rand}で，\QImodemult{rand}回出現している．
 
 
 \end{document}

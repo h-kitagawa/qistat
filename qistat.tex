@@ -1,0 +1,303 @@
+\documentclass[b5j]{jsarticle}
+\usepackage[textwidth=40zw,lines=40]{geometry}
+\usepackage[dvipdfmx,draft]{hyperref}
+\usepackage{lmodern,booktabs,bm,array}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage[first=1,last=6]{lcg}
+
+\usepackage{qistat}
+
+\title{\texttt{qistat}パッケージ\\
+{\large 数学I「データの分析」用マクロ}}
+\author{北川 弘典}
+
+\catcode`\|=13
+\def|#1|{\textit{\rmfamily\mdseries $\langle$#1\/$\rangle$}}
+\def\cs#1{\texttt{\def\{{\char`\{}\def\}{\char`\}}\char`\\ #1}}
+\xspcode`\\=3
+\xspcode`\*=3
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+このパッケージは，高等学校「数学I」に出てくる各種統計量を
+\TeX の内部だけで計算するパッケージである．
+本来は，こういう統計処理は外部ソフトウェアを使うべきであり，
+本パッケージのように\TeX だけで行うのは\textbf{余興}の域を
+出ないであろう．
+\end{abstract}
+
+\section{動作環境}
+\TeX 本体の数値計算機能を
+そのまま使うのはあまりにも貧弱である\footnote{%
+  $2^{-16}$\,ptを単位とした符号付き31\,bitの整数演算，言い換えれば
+  整数部14\,bit，小数部16\,bit（及び符号ビット）の固定小数点演算．
+  また基本的には四則演算の機能しかなく．
+  Newton法などで平方根計算をしてもあまり精度が出ない．
+}ので，
+数値計算には\textbf{\texttt{fp}パッケージ}\footnote{%
+  整数部・小数部ともに10進18桁の範囲の固定小数点演算を
+  実現させるMichael Mehlich氏作のパッケージである．
+  万が一導入されていなければ，
+  \url{http://www.ctan.org/tex-archive/macros/latex/contrib/fp/}から
+  ダウンロードできる．
+}が必要である．それ以外の外部パッケージは必要ないはずである．
+なお，plain \TeX では使用できず，\LaTeXe の下で動作する．
+
+\section{命令一覧}
+本パッケージの提供する命令は基本的には\texttt{QI}で始まるが，
+統計量の出力命令には小文字の\texttt{qi}で始まるバリエーションがある．
+
+\subsection{初期化・値の追加}
+\begin{description}
+\item[\cs{QIinit}|name|]
+|name|という名称の内部リストを宣言する．初期値は空である．
+
+\item[\cs{QIappend|name||data|}]
+内部リスト|name|の末尾に1つの値|data|を追加する．
+
+標準では，データを追加した時点で各種統計量の再計算を行う．
+\cs{QIappend}等を複数回連続で呼び出すときは無駄になってしまうので，
+その場合は\cs{QIappend*}と末尾にアスタリスクをつけることで再計算を抑止できる．
+
+\item[\cs{QIconcatI|name||name2|}]
+内部リスト|name|の末尾に，内部リスト|name2|の内容を連結する．
+内部リスト|name|は予め宣言されていなくてはならない．
+\cs{QIconcatI*}を末尾にアスタリスクをつけることで再計算を抑止できる．
+
+\item[\cs{QIconcatC|name|\{|comma-separated list|\}}]
+内部リスト|name|の末尾に，第2引数で与えられたコンマ区切りリストの内容を連結する．
+内部リスト|name|は予め宣言されていなくてはならない．
+\cs{QIconcatC*}を末尾にアスタリスクをつけることで再計算を抑止できる．
+
+\item[\cs{QIdata|name|\{|comma-separated list|\}}]
+内部リスト|name|の内容を第2引数で与えられたコンマ区切りリストで初期化する．
+内部リスト|name|が未宣言のときは，ここで宣言される．
+
+\item[\cs{QIcopy|name||newname|}]
+内部リスト|name|の内容を内部リスト|newname|にコピーする．
+コピー先の|newname|が予め宣言されている必要はない．
+\end{description}
+
+コンマ区切りリスト中に「空の項目」はあってはならない．
+従って，
+\begin{quote}
+\begin{verbatim}
+\QIdata{hoge}{1,2,3,4,}
+\end{verbatim}
+\end{quote}
+のように最後にコンマを余計につけることも禁止である．
+
+\subsection{統計量の出力}
+本節の命令それぞれに対して，
+\cs{QIavg}に対して\cs{qiavg}のように
+最初の2文字が小文字になった変種が存在する．
+両者の違いは出力フォーマットで，
+\begin{itemize}
+ \item 
+大文字の\cs{QIavg}他は小数第\cs{value\{QIdigit\}}位まで\footnote{元の値が整数などの場合は，
+小数点以下を補って出力する．}出力する．
+カウンタ\texttt{QIdigit}のデフォルト値は2．
+ \item 
+小文字の\cs{qiavg}他は\texttt{fp}パッケージによる計算結果そのままで
+出力する．
+\end{itemize}
+例えば，
+\begin{quote}
+\begin{verbatim}
+\QIdata{hoge}{1,0,0,0,0,0,0}\QIavg{hoge}, \qiavg{hoge}
+\end{verbatim}
+\end{quote}
+からは，「\QIdata{hoge}{1,0,0,0,0,0,0}%
+\QIavg{hoge}, \qiavg{hoge}」が得られる．
+
+\begin{description}
+\item[\cs{QIcnt}|name|]
+内部リスト|name|のデータ数
+\item[\cs{QIsum}|name|]
+内部リスト|name|の合計値
+\item[\cs{QIavg}|name|]
+内部リスト|name|の平均値
+\item[\cs{QIvar}|name|]
+内部リスト|name|の分散
+\item[\cs{QIstdev}|name|]
+内部リスト|name|の標準偏差
+\item[\cs{QImedian}|name|]
+内部リスト|name|の中央値
+\item[\cs{QIlqt}|name|]
+内部リスト|name|の第1四分位数(\underline{l}ower \underline{q}uar\underline{t}ile)
+\item[\cs{QIuqt}|name|]
+内部リスト|name|の第3四分位数(\underline{u}pper \underline{q}uar\underline{t}ile)
+\item[\cs{QIiqr}|name|]
+内部リスト|name|の四分位範囲(\underline{IQR})
+\item[\cs{QImin}|name|]
+内部リスト|name|の最小値
+\item[\cs{QImax}|name|]
+内部リスト|name|の最大値
+\item[\cs{QIcov}|name1||name2|]
+2つの内部リスト|name1|,~|name2|の共分散(\underline{cov}ariance)
+\item[\cs{QIpcc}|name1||name2|]
+2つの内部リスト|name1|,~|name2|の相関係数\\*\hfill
+(\underline{P}earson product-moment \underline{c}orrelation \underline{c}oefficient)
+\end{description}
+
+\begin{itemize}
+ \item 
+\cs{QIlqt}, \cs{QIuqt}で計算する四分位数の定義は
+文科省流のもので，
+第1四分位数は「下位のデータの中央値」，
+第3四分位数は「上位のデータの中央値」として計算する．
+
+\item 内部リスト|name|が空リストの場合でも，
+上記の命令類はエラーは返さず，適当な値となる．例えば
+\cs{QImin}, \cs{QImax}はそれぞれ
+\texttt{fp}パッケージの扱える最大値・最小値となる．
+
+\item 2つのリストから計算される\cs{QIcov}, \cs{QIpcc}\emph{以外}の統計量は，
+内部リストの変更に伴い再計算される．
+\end{itemize}
+
+\subsection{その他}
+\begin{description}
+\item[\cs{QIout}|name|, \cs{qiout}|name|]
+内部リスト|name|の内容を「\verb*+, +」で区切って出力．\\
+前節と同様に，小文字の\cs{qiout}は各データをそのまま出力するが，
+大文字の\cs{QIout}は各データを丸めて出力する．
+
+\item[\cs{QIshift}|name|, \cs{qishift}|name|]
+内部リスト|name|の先頭のデータを出力する．
+|name|からは先頭のデータは取り除かれる．
+
+前節と同様に，小文字の\cs{qishift}は各データをそのまま出力するが，
+大文字の\cs{QIshift}は各データを丸めて出力する
+
+またこの命令は，内部リストの内容を表組などの整形用途を目的として作成されており，
+「先頭のデータを取り除く」操作はグローバルなものであり，
+さらに統計量の再計算は行わない．
+
+\item[\cs{QIsort}|name||newname|]
+内部リスト|name|内のデータを小さい順に並べた内部リストを
+|newname|として参照できるようにする．
+|newname|が予め宣言されている必要はなく，
+また，|name|が更新されても|newname|の値は追従しない．
+
+\item[\cs{QIboxplot[|height|{]}|list|}]
+|list|内のデータを元に箱ひげ図を作成する．
+\texttt{picture}環境の内部で
+\begin{verbatim}
+\put(0,2){\QIboxplot{tokyo}}
+\end{verbatim}
+のように用いることを想定しており，\cs{put}の座標を0として，
+\cs{unitlength}を単位長さとし，右方向を正として組まれる．
+箱は高さが2|height|\cs{unitlength}，
+最大値・最小値の位置の縦棒と平均値の位置の十字の大きさは
+その半分の|height|\cs{unitlength}としている．
+省略時の|height|は1である．
+\end{description}
+
+\newpage
+\section{例1}
+
+元データは1984--2013の熱帯夜\footnote{%
+  熱帯夜とは，最低気温が25度以上の日のことである．
+}日数．
+気象庁ホームページの\url{http://www.data.jma.go.jp/obd/stats/etrn/index.php}より．
+
+\QIdata{tokyo}{%
+  35,29,20,29,12,23,33,23,32,4,%
+  47,38,15,19,31,46,41,25,33,17,%
+  41,31,20,31,25,20,56,49,49,39}
+\QIdata{osaka}{%
+  32,43,23,37,15,27,50,39,34,14,%
+  59,42,30,25,46,37,57,48,48,30,%
+  51,46,44,44,42,27,55,51,43,47}
+\QIdata{nagoya}{%
+  22,19,7,20,5,5,28,16,15,1,%
+  39,35,17,10,19,13,31,22,33,13,%
+  23,24,23,30,28,13,40,30,30,22}
+
+
+\begin{center}
+ \begin{tabular}{>{\bfseries}lrrrrrrrr}
+ \toprule
+ \multicolumn{1}{c}{$\bm{X}$}&
+ \multicolumn{1}{c}{$\bm{\overline{X}}$}&\multicolumn{1}{c}{$\bm{\sigma^2}$}&
+ \multicolumn{1}{c}{$\bm{\sigma}$}&\multicolumn{1}{c}{\textbf{min}}&
+ \multicolumn{1}{c}{$\bm{Q_1}$}&\multicolumn{1}{c}{\bfseries 中央値}&
+ \multicolumn{1}{c}{$\bm{Q_3}$}&\multicolumn{1}{c}{\textbf{max}}\\
+ \midrule
+ 東京&%
+  \QIavg{tokyo}&\QIvar{tokyo}&\QIstdev{tokyo}&\qimin{tokyo}&
+  \qilqt{tokyo}&\qimedian{tokyo}&\qiuqt{tokyo}&\qimax{tokyo}\\
+ 大阪&%
+  \QIavg{osaka}&\QIvar{osaka}&\QIstdev{osaka}&\qimin{osaka}&
+  \qilqt{osaka}&\qimedian{osaka}&\qiuqt{osaka}&\qimax{osaka}\\
+ 名古屋&%
+  \QIavg{nagoya}&\QIvar{nagoya}&\QIstdev{nagoya}&\qimin{nagoya}&
+  \qilqt{nagoya}&\qimedian{nagoya}&\qiuqt{nagoya}&\qimax{nagoya}\\
+ \bottomrule
+ \end{tabular}
+
+\medskip
+
+\setlength{\unitlength}{0.55zw}
+\newcounter{axis}
+\begin{picture}(65,14)(-5,-2)
+{\color{gray}%
+\multiput(5,0)(5,0){12}{\line(0,1){12}}
+}%
+\multiput(0,0)(5,0){13}{%
+  \makebox(0,0)[t]{\scriptsize\strut\arabic{axis}\addtocounter{axis}{5}}
+}%
+
+\thicklines
+\put(0,10){\QIboxplot{tokyo}}
+\put(0,6) {\QIboxplot{osaka}}
+\put(0,2) {\QIboxplot{nagoya}}
+\put(0,10){\makebox(0,0)[r]{東京\quad  }}
+\put(0,6) {\makebox(0,0)[r]{大阪\quad  }}
+\put(0,2) {\makebox(0,0)[r]{名古屋\quad}}
+\put(0,0){\line(0,1){12}}
+\put(60,0){\line(0,1){12}}
+\put(0,12){\line(1,0){60}}
+\put(0,0){\line(1,0){60}}
+\end{picture}
+
+\medskip
+
+ \begin{tabular}{>{\bfseries}lrrr}
+ \toprule
+ &\multicolumn{1}{l}{\bfseries 東京・大阪}&
+ \multicolumn{1}{l}{\bfseries 東京・名古屋}&
+ \multicolumn{1}{l}{\bfseries 大阪・名古屋}\\
+ \midrule
+ 共分散&\QIcov{tokyo}{osaka}&
+ \QIcov{tokyo}{nagoya}&\QIcov{osaka}{nagoya}\\
+ 相関係数&\QIpcc{tokyo}{osaka}&
+ \QIpcc{tokyo}{nagoya}&\QIpcc{osaka}{nagoya}\\
+ \bottomrule
+ \end{tabular}
+\end{center}
+
+\section{例2}
+
+\QIinit{rand}
+\newcounter{iter}
+\setcounter{iter}{0}
+\loop
+  \stepcounter{iter}\rand
+  \QIappend*{rand}{\arabic{rand}}%
+  \ifnum\value{iter}<155
+\repeat
+\QIrecalc{iter}
+
+%\paragraph{元データ}\leavevmode\par
+%\begin{quote}
+%  \qiout{rand}
+%\end{quote}
+
+
+
+
+\end{document}

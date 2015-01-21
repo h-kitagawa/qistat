@@ -1,0 +1,358 @@
+\ProvidesPackage{qistat}{}
+
+\RequirePackage{fp}
+\FPmessagesfalse
+\def\qi@fpmax{999999999999999999.999999999999999999}
+\def\qi@fpmin{-999999999999999999.999999999999999999}
+
+%%%%%%%% 高レベルマクロ
+\newif\if@qi@recalc
+
+%%% \QIinit<name>
+\def\QIinit#1{\expandafter\def\csname qil@#1\endcsname{}}
+
+%%% \QIrecalc<name>
+\def\QIrecalc#1{\qi@recalc{#1}}
+
+%%% \QIappend<name><data>
+\def\QIappend{%
+  \@ifstar{\@qi@recalcfalse\QIappend@}{\@qi@recalctrue\QIappend@}}
+\def\QIappend@#1#2{%
+  \expandafter\qi@append\csname qil@#1\endcsname{#2}%
+  \if@qi@recalc\qi@recalc{#1}\fi}
+
+%%% \QIconcatI<name><name'>: 2つの 内部リストを連結
+\def\QIconcatI{%
+  \@ifstar{\@qi@recalcfalse\QIconcatI@}{\@qi@recalctrue\QIconcatI@}}
+\def\QIconcatI@#1#2{%
+  \let\@elt\relax
+  \expandafter\edef\csname qil@#1\endcsname{%
+    \csname qil@#1\endcsname\csname qil@#2\endcsname}%
+  \if@qi@recalc\qi@recalc{#1}\fi}
+
+%%% \QIconcatC<name><comma-separated list>
+\def\QIconcatC{%
+  \@ifstar{\@qi@recalcfalse\QIconcatC@}{\@qi@recalctrue\QIconcatC@}}
+\def\QIconcatC@#1#2{%
+  \@temptokena{}\let\@elt\relax
+  \@for\@@temp:=#2\do{%
+    \edef\@temp{\the\@temptokena\@elt{\@@temp}}%
+    \@temptokena\expandafter{\@temp}%
+  }%
+  \expandafter\edef\csname qil@#1\endcsname
+    {\csname qil@#1\endcsname\the\@temptokena}%
+  \if@qi@recalc\qi@recalc{#1}\fi
+}
+
+%%% \QIdata<name><comma-separated list>
+\def\QIdata#1#2{%
+  \QIinit{#1}\QIconcatC{#1}{#2}%
+}
+
+%%% 出力命令達
+\newcounter{QIdigit}
+\setcounter{QIdigit}{2}
+\def\qi@make#1#2{%
+  \expandafter\def\csname QI#1\endcsname##1{%
+    \FPround\qi@temp{\csname qil#2@##1\endcsname}{\value{QIdigit}}%
+    \qi@temp}%
+  \expandafter\def\csname qi#1\endcsname##1{\csname qil#2@##1\endcsname}}
+
+\qi@make{cnt}{C}
+\qi@make{sum}{SU}
+\qi@make{avg}{A}
+\qi@make{var}{V}
+\qi@make{stdev}{D}
+\qi@make{median}{Q2}
+\qi@make{lqt}{Q1}
+\qi@make{uqt}{Q3}
+\qi@make{iqr}{IQ}
+\qi@make{min}{MI}
+\qi@make{max}{MA}
+
+\def\qiout#1{{%
+  \@tempswafalse
+  \def\@elt##1{\if@tempswa, \else\@tempswatrue\fi##1}%
+  \csname qil@#1\endcsname
+}}
+\def\QIout#1{{%
+  \@tempswafalse
+  \def\@elt##1{%
+    \if@tempswa, \else\@tempswatrue\fi
+    \FPround\@qitemp{##1}{\value{QIdigit}}\@qitemp}%
+  \csname qil@#1\endcsname
+}}
+
+%%% 共分散
+\def\qi@pop#1#2{\expandafter\qi@pop@#2\@nil#1#2}
+\def\qi@pop@\@elt#1#2\@nil#3#4{\def#3{#1}\def#4{#2}}
+\def\qicov@#1#2{%
+  \ifnum\qicnt{#1}=\qicnt{#2}\relax
+    \ifnum\qicnt{#1}=\z@
+      \FPclip\@tempfpe{0}
+    \else
+      \@tempcnta=\qicnt{#1}\FPset\@tempfpe{0}%
+      \edef\@tempfpa{\qiavg{#1}}\edef\@qitempa{\csname qil@#1\endcsname}
+      \edef\@tempfpb{\qiavg{#2}}\edef\@qitempb{\csname qil@#2\endcsname}
+      \loop
+        \ifnum\@tempcnta>\z@
+        \advance\@tempcnta\m@ne
+        \qi@pop\@tempfpc\@qitempa\FPsub\@tempfpc\@tempfpc\@tempfpa
+        \qi@pop\@tempfpd\@qitempb\FPsub\@tempfpd\@tempfpd\@tempfpb
+        \FPmul\@tempfpc\@tempfpc\@tempfpd
+        \FPadd\@tempfpe\@tempfpe\@tempfpc
+      \repeat
+      \FPdiv\@tempfpe\@tempfpe{\qicnt{#1}}
+      \FPclip\@tempfpe\@tempfpe
+    \fi
+  \else
+    \PackageError{qistat}{the length of `#1' and that of `#2' differ}
+ \fi\relax
+}
+
+\def\qicov#1#2{\qicov@{#1}{#2}\@tempfpe}
+\def\QIcov#1#2{\qicov@{#1}{#2}\FPround\@qitemp\@tempfpe{\value{QIdigit}}\@qitemp}
+
+%%% 相関係数
+\def\qipcc@#1#2{%
+  \ifnum\qicnt{#1}=\qicnt{#2}\relax
+    \ifnum\qicnt{#1}=\z@
+      \FPclip\@tempfpe{0}%
+    \else
+      \qicov@{#1}{#2}%
+      \FPmul\@tempfpa{\csname qilD@#1\endcsname}{\csname qilD@#2\endcsname}
+      \FPdiv\@tempfpe\@tempfpe\@tempfpa
+      \FPclip\@tempfpe\@tempfpe
+    \fi
+  \else
+    \PackageError{qistat}{the length of `#1' and that of `#2' differ}
+ \fi
+}
+\def\qipcc#1#2{\qipcc@{#1}{#2}\@tempfpe}
+\def\QIpcc#1#2{\qipcc@{#1}{#2}\FPround\@qitemp\@tempfpe{\value{QIdigit}}\@qitemp}
+
+%%% その他
+
+%%% #1 をソートした列を別の名称 #2 で参照できるように
+\def\QIsort#1#2{%
+  \expandafter\edef\csname qil@#2\endcsname{\csname qilS@#1\endcsname}%
+  \qi@recalc{#2}%
+}
+
+%%% #1 の内容を #2 にコピー
+\def\QIcopy{%
+  \@ifstar{\@qi@recalcfalse\QIcopy@}{\@qi@recalctrue\QIcopy@}}
+\def\QIcopy@#1#2{%
+  \expandafter\edef\csname qil@#2\endcsname{\csname qil@#1\endcsname}%
+  \if@qi@recalc\qi@recalc{#2}\fi%
+}
+
+%%% #1 から先頭データを取り除く
+\def\qi@Apop#1#2{%
+  \edef\@temp{\csname qil@#2\endcsname}%
+  \expandafter\qi@Apop@\@temp\@nil#1{#2}}
+\def\qi@Apop@\@elt#1#2\@nil#3#4{%
+  \def#3{#1}\expandafter\xdef\csname qil@#4\endcsname{#2}}
+\def\QIshift#1{%
+  \let\@elt\relax\qi@Apop\@tempfpa{#1}%
+  \FPround\@tempfpa\@tempfpa{\value{QIdigit}}\@tempfpa}
+\def\qishift#1{%
+  \let\@elt\relax\qi@Apop\@tempfpa{#1}%
+  \@tempfpa}
+
+%%% \QIboxplot[<height>]<name>
+\def\QIboxplot{\@ifnextchar[{\QIboxplot@}{\QIboxplot@[1]}}%]
+\def\QIboxplot@[#1]#2{{%
+  \begin{picture}(0,0)
+    \@tempdima#1\p@\divide\@tempdima\tw@
+    \edef\@qib@half{\strip@pt\@tempdima}
+    \put(\qiavg{#2},0){\line(0,1){\@qib@half}}
+    \put(\qiavg{#2},0){\line(0,-1){\@qib@half}}
+    \put(\qiavg{#2},0){\line(1,0){\@qib@half}}
+    \put(\qiavg{#2},0){\line(-1,0){\@qib@half}}
+    %
+    \put(\qimin{#2},0){\line(0,1){#1}}
+    \put(\qimin{#2},0){\line(0,-1){#1}}
+    %
+    \put(\qimedian{#2},0){\line(0,1){#1}}
+    \put(\qimedian{#2},0){\line(0,-1){#1}}
+    %
+    \put(\qimax{#2},0){\line(0,1){#1}}
+    \put(\qimax{#2},0){\line(0,-1){#1}}
+    %
+    \put(\qilqt{#2},0){\line(0,1){#1}}
+    \put(\qilqt{#2},0){\line(0,-1){#1}}
+    %
+    \put(\qiuqt{#2},0){\line(0,1){#1}}
+    \put(\qiuqt{#2},0){\line(0,-1){#1}}
+    %
+    \FPsub\@tempfpa{\qilqt{#2}}{\qimin{#2}}
+    \put(\qimin{#2},0){\line(1,0){\@tempfpa}}
+    \FPsub\@tempfpa{\qimax{#2}}{\qiuqt{#2}}
+    \put(\qiuqt{#2},0){\line(1,0){\@tempfpa}}
+    %
+    \put(\qilqt{#2},1){\line(1,0){\qiiqr{#2}}}
+    \put(\qilqt{#2},-1){\line(1,0){\qiiqr{#2}}}
+  \end{picture}
+}}
+
+
+%%%%%%%% internal
+
+\def\qi@upvalue#1#2#3{%
+  \begingroup#1\let\@elt\relax%
+  \edef\@temp{\endgroup\def\noexpand#2{#3}}%
+  \@temp}
+\def\qi@append#1#2{%
+  \@temptokena\expandafter{#1\@elt}%
+  \edef#1{\the\@temptokena{#2}}}
+
+\def\qi@recalc#1{% 再計算
+  \edef\@qitemp{\csname qil@#1\endcsname}%
+  \@tempcnta\z@
+  \FPset\@tempfpa{0}%
+  \FPset\@tempfpb{0}%
+  \def\@elt##1{%
+    \advance\@tempcnta\@ne
+    \FPadd\@tempfpa\@tempfpa{##1}%
+  }\@qitemp\let\@elt\relax
+  \expandafter\edef\csname qilC@#1\endcsname{\the\@tempcnta}% データ数
+  \expandafter\let\csname qilSU@#1\endcsname\@tempfpa% 合計
+  \ifnum\@tempcnta=\z@\@tempcnta\@ne\fi% division by zero を防ぐ
+  \expandafter\FPdiv\csname qilA@#1\endcsname\@tempfpa{\the\@tempcnta}% 平均
+  \FPset\@tempfpa{0}%
+  \def\@elt##1{%
+    \FPsub\@tempfpb{##1}{\csname qilA@#1\endcsname}%
+    \FPmul\@tempfpb\@tempfpb\@tempfpb
+    \FPadd\@tempfpa\@tempfpa\@tempfpb
+  }\@qitemp\let\@elt\relax
+  \FPdiv\@tempfpa\@tempfpa{\the\@tempcnta}%
+  \expandafter\FPclip\csname qilV@#1\endcsname\@tempfpa%     分散
+  \expandafter\FProot\csname qilD@#1\endcsname\@tempfpa{2}% 標準偏差
+  %
+  \qi@upvalue{\qi@sort\@tempcnta\@qitemp\@qitemp}\@qitemp{\@qitemp}%
+  \expandafter\let\csname qilS@#1\endcsname\@qitemp% ソート済リスト
+  %
+  \qi@median\@qitemp
+  \expandafter\FPclip\csname qilQ2@#1\endcsname\@tempfpa% 中央値
+  \qi@upvalue{\qi@median\@qitempa}\@tempfpa{\@tempfpa}%
+  \expandafter\FPclip\csname qilQ1@#1\endcsname\@tempfpa% 第1四分位数
+  \qi@upvalue{\qi@median\@qitempb}\@tempfpb{\@tempfpa}%
+  \expandafter\FPclip\csname qilQ3@#1\endcsname\@tempfpb% 第3四分位数
+  \FPsub\@tempfpa\@tempfpb\@tempfpa
+  \expandafter\FPclip\csname qilIQ@#1\endcsname\@tempfpa% 四分位範囲
+  %
+  \FPset\@tempfpa\qi@fpmax\FPset\@tempfpb\qi@fpmin
+  \def\@elt##1{%
+    \@gobble\if\FPiflt\@tempfpb{##1}%
+      \FPset\@tempfpb{##1}%
+    \fi
+    \@gobble\if\FPifgt\@tempfpa{##1}%
+      \FPset\@tempfpa{##1}%
+    \fi
+  }\csname qil@#1\endcsname
+  \expandafter\FPclip\csname qilMI@#1\endcsname{\@tempfpa}% 最小値
+  \expandafter\FPclip\csname qilMA@#1\endcsname{\@tempfpb}% 最大値
+%
+  \let\@elt\relax}
+
+
+%%% ソート
+\def\qi@decone#1{%
+  \@tempcnta\z@
+  \def\@elt##1{%
+    \ifnum\@tempcnta=\z@
+      \def\@tempfpa{##1}\advance\@tempcnta\@ne
+    \fi}%
+  #1%
+  \let\@elt\relax}
+\def\qi@dectwo#1{%
+  \@tempcnta\z@
+  \def\@elt##1{%
+    \ifnum\@tempcnta=\z@
+      \def\@tempfpa{##1}\advance\@tempcnta\@ne
+    \else\ifnum\@tempcnta=\@ne
+      \def\@tempfpb{##1}\advance\@tempcnta\@ne
+    \fi\fi}%
+  #1%
+  \let\@elt\relax}
+\def\qi@sort#1#2#3{%
+  \@tempcnta=#1\relax
+  \ifnum\@tempcnta<\tw@% 要素が0 or 1つのみ→確定
+    \let#2#3%
+  \else\if\@tempcnta=\tw@% 2つのみ→直接比較
+    \qi@dectwo{#3}%
+    \@gobble\if\FPiflt\@tempfpa\@tempfpb
+      \let#2#3%
+    \else
+      \edef#2{\@elt{\@tempfpb}\@elt{\@tempfpa}}%
+    \fi
+  \else% 3つ以上
+    % ソート方法は quicksort の変種（作業領域を無頓着に使ったもの）
+    \edef\@qitemp{#3}%
+    \qi@decone\@qitemp% pivot: #2 の最初の値
+    \def\@qis@left{}\def\@qis@right{}\def\@qis@mid{}%
+    \@tempcnta\z@\@tempcntb\z@%
+    \def\@elt##1{%
+      \FPset\@tempfpb{##1}%
+      \@gobble\if\FPiflt\@tempfpb\@tempfpa
+        \qi@append\@qis@left{##1}\advance\@tempcnta\@ne
+      \else\@gobble\if\FPifgt\@tempfpb\@tempfpa
+        \qi@append\@qis@right{##1}\advance\@tempcntb\@ne
+      \else
+        \qi@append\@qis@mid{##1}%
+      \fi\fi}%
+    \@qitemp\let\@elt\relax
+    %
+    \qi@upvalue{\qi@sort\@tempcnta\@qitemp\@qis@left}\@qis@left{\@qitemp}%
+    \qi@upvalue{\qi@sort\@tempcntb\@qitemp\@qis@right}\@qis@right{\@qitemp}%
+    \edef#2{\@qis@left\@qis@mid\@qis@right}%
+  \fi\fi}
+
+%%% 四分位数・中央値
+\def\qi@median#1{%
+  \@tempcnta\z@\let\@qitemp#1%
+  \def\@elt##1{\advance\@tempcnta\@ne}%
+  \@qitemp\let\@elt\relax
+  %
+  \ifodd\@tempcnta
+    \@tempcntb\@tempcnta
+    \advance\@tempcntb\m@ne
+    \divide\@tempcntb\tw@
+    \@tempcnta\@ne
+    \def\@qitempa{}\def\@qitempb{}%
+    \def\@elt##1{%
+      \ifnum\@tempcnta=\@tempcntb
+        \FPset\@tempfpa{##1}%
+      \else\ifnum\@tempcnta<\@tempcntb
+        \qi@append\@qitempa{##1}%
+      \else
+        \qi@append\@qitempb{##1}%
+      \fi\fi
+      \advance\@tempcnta\@ne
+    }%
+    \@qitemp\let\@elt\relax
+  \else
+    \@tempcntb\@tempcnta\divide\@tempcntb\tw@
+    \count@\@tempcntb\advance\count@\@ne
+    \def\@qitempa{}\def\@qitempb{}%
+    \@tempcnta\@ne
+    \def\@elt##1{%
+      \ifnum\@tempcnta=\@tempcntb
+        \FPset\@tempfpa{##1}%
+      \else\ifnum\@tempcnta=\count@
+        \FPadd\@tempfpa\@tempfpa{##1}%
+      \fi\fi
+      \ifnum\@tempcnta<\count@
+        \qi@append\@qitempa{##1}%
+      \fi
+     \ifnum\@tempcnta>\@tempcntb
+         \qi@append\@qitempb{##1}%
+      \fi
+      \advance\@tempcnta\@ne
+    }%
+    \@qitemp\let\@elt\relax
+    \FPdiv\@tempfpa\@tempfpa{2}%
+  \fi}
+
+\endinput

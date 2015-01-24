@@ -1,7 +1,7 @@
 \documentclass[b5j]{jsarticle}
 \usepackage[textwidth=40zw,lines=40]{geometry}
 \usepackage[dvipdfmx,draft]{hyperref}
-\usepackage{lmodern,booktabs,bm,array}
+\usepackage{lmodern,booktabs,bm,array,amsmath}
 \usepackage[dvipdfmx]{xcolor}
 \usepackage[first=1,last=6]{lcg}
 
@@ -151,8 +151,11 @@
 内部リスト|name|の最頻値（のうち最小のもの）
 \item[\cs{QImodemult}|name|]
 内部リスト|name|の最頻値が何回出現しているか
-%\item[\cs{QIpct}|name||q|]
-%内部リスト|name|の$q$パーセンタイル(\underline{p}er\underline{c}en\underline{t}ile)
+\item[\cs{QIpct}|name||q|]
+内部リスト|name|の$q$パーセンタイル\footnote{%
+  データ数を$n$としたとき，$1+q(n-1)/100$番目のデータ値，として計算している．
+  整数でなかった場合は隣り合ったデータから線型に補完．
+}(\underline{p}er\underline{c}en\underline{t}ile)
 \item[\cs{QIcov}|name1||name2|]
 2つの内部リスト|name1|,~|name2|の共分散(\underline{cov}ariance)
 \item[\cs{QIpcc}|name1||name2|]
@@ -166,17 +169,18 @@
 （少なくとも数研出版の）教科書で採用されているものを採用している．
 具体的には，第1四分位数は「下位のデータの中央値」，
 第3四分位数は「上位のデータの中央値」として計算する%
-\footnote{Turkeyのヒンジ値というそうだ．}．
+\footnote{データ数が$2k+1$の場合，「下位のデータ」「上位のデータ」は中央値を
+含めない$k$個のデータ達のことを指す．Tukeyのヒンジ値というそうだ．}．
 
-%Excelのquartile関数による値と同じ計算法を用いたいならば，
-%\cs{QIpct|name|\{25\}}, \cs{QIpct|name|\{75\}}などとすること．
+Excelのquartile関数による値と同じ計算法を用いたいならば，
+\cs{QIpct|name|\{25\}}, \cs{QIpct|name|\{75\}}などとすること．
 
 \item 内部リスト|name|が空リストの場合でも，
 上記の命令類はエラーは返さず，適当な値となる．例えば
 \cs{QImin}, \cs{QImax}はそれぞれ
 \texttt{fp}パッケージの扱える最大値・最小値となる．
 
-\item 本節の命令で出力される統計量は
+\item 本節の命令で出力される統計量のうち
 内部リストの変更に伴い自動的に計算されるだけであり，
 \emph{命令実行時にその都度計算されるわけではない}．
 従って，前節で述べた
@@ -265,7 +269,6 @@
   \qilqt{nagoya}&\qimedian{nagoya}&\qiuqt{nagoya}&\qimax{nagoya}\\
  \bottomrule
  \end{tabular}
-
 \medskip
 
 \setlength{\unitlength}{0.55zw}
@@ -327,5 +330,51 @@
 という\QIcnt{rand}個のデータにおける
 最頻値（のうち最小のもの）は\qimode{rand}で，\QImodemult{rand}回出現している．
 
+
+\section{\cs{QIlqt}・\cs{QIuqt}と\cs{QIpct}}
+
+\subsection{データ数が$4k+1$のとき}
+\QIdata{test}{1,2,3,4,5,6,7,8,9}
+
+元データ（\texttt{test}）が\qiout{test}のとき，
+
+\begin{align*}
+ \cs{QIlqt\{test\}} &= \QIlqt{test},&\cs{QIuqt\{test\}} &= \QIuqt{test}\\
+ \cs{QIpct\{test\}\{25\}} &= \QIpct{test}{25},&
+ \cs{QIpct\{test\}\{75\}} &= \QIpct{test}{75}.
+\end{align*}
+
+\subsection{データ数が$4k+2$のとき}
+\QIappend{test}{10}
+
+元データ（\texttt{test}）が\qiout{test}のとき，
+
+\begin{align*}
+ \cs{QIlqt\{test\}} &= \QIlqt{test},&\cs{QIuqt\{test\}} &= \QIuqt{test}\\
+ \cs{QIpct\{test\}\{25\}} &= \QIpct{test}{25},&
+ \cs{QIpct\{test\}\{75\}} &= \QIpct{test}{75}.
+\end{align*}
+
+\subsection{データ数が$4k+3$のとき}
+\QIappend{test}{11}
+
+元データ（\texttt{test}）が\qiout{test}のとき，
+
+\begin{align*}
+ \cs{QIlqt\{test\}} &= \QIlqt{test},&\cs{QIuqt\{test\}} &= \QIuqt{test}\\
+ \cs{QIpct\{test\}\{25\}} &= \QIpct{test}{25},&
+ \cs{QIpct\{test\}\{75\}} &= \QIpct{test}{75}.
+\end{align*}
+
+\subsection{データ数が$4k$のとき}
+\QIappend{test}{12}
+
+元データ（\texttt{test}）が\qiout{test}のとき，
+
+\begin{align*}
+ \cs{QIlqt\{test\}} &= \QIlqt{test},&\cs{QIuqt\{test\}} &= \QIuqt{test}\\
+ \cs{QIpct\{test\}\{25\}} &= \QIpct{test}{25},&
+ \cs{QIpct\{test\}\{75\}} &= \QIpct{test}{75}.
+\end{align*}
 
 \end{document}

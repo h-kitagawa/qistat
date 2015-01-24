@@ -102,7 +102,7 @@
         \FPmul\@tempfpc\@tempfpc\@tempfpd
         \FPadd\@tempfpe\@tempfpe\@tempfpc
       \repeat
-      \FPdiv\@tempfpe\@tempfpe{\QIcnt{#1}}
+      \FPdiv\@tempfpe\@tempfpe{\QIcnt{#1}}%
       \FPclip\@tempfpe\@tempfpe
     \fi
   \else
@@ -130,6 +130,47 @@
 }
 \def\qipcc#1#2{\qipcc@{#1}{#2}\@tempfpe}
 \def\QIpcc#1#2{\qipcc@{#1}{#2}\FPround\@qitemp\@tempfpe{\value{QIdigit}}\@qitemp}
+
+%%% パーセンタイル
+
+\def\qipct@#1#2{%
+  \ifnum\QIcnt{#1}=0\relax
+    \FPclip\@tempfpe{0}
+  \else
+    \edef\@tempfpa{\QIcnt{#1}}
+    \edef\@tempfpb{#2}
+    \FPupn\@tempfpa{%
+      1 \@tempfpa{} - \@tempfpb{} * 100 swap / 1 +
+    }%
+    \@gobble\if\FPifint\@tempfpa
+      \@tempcnta\z@
+      \FPtrunc\@tempfpa\@tempfpa{0}
+      \def\@elt##1{%
+        \advance\@tempcnta\@ne
+        \ifnum\@tempfpa=\@tempcnta
+          \FPset\@tempfpe{##1}%
+        \fi}
+      \csname qilS@#1\endcsname\let\@elt\relax
+    \else
+      \count@\z@\FPset\@tempfpd{1}
+      \FPtrunc\@tempfpb\@tempfpa{0}\@tempcnta=\@tempfpb
+      \FPsub\@tempfpb\@tempfpa\@tempfpb% 小数部
+      \FPsub\@tempfpc\@tempfpd\@tempfpb
+      \@tempcntb\@tempcnta\advance\@tempcntb\@ne
+      \def\@elt##1{%
+        \advance\count@\@ne
+        \ifnum\@tempcnta=\count@
+          \FPmul\@tempfpe\@tempfpc{##1}%
+        \else\ifnum\@tempcntb=\count@
+          \FPmul\@tempfpb\@tempfpb{##1}
+          \FPadd\@tempfpe\@tempfpe\@tempfpb
+        \fi\fi}
+      \csname qilS@#1\endcsname\let\@elt\relax
+    \fi
+  \fi
+}
+\def\qipct#1#2{\qipct@{#1}{#2}\@tempfpe}
+\def\QIpct#1#2{\qipct@{#1}{#2}\FPround\@qitemp\@tempfpe{\value{QIdigit}}\@qitemp}
 
 %%% その他
 
@@ -344,7 +385,7 @@
   %
   \ifodd\@tempcnta
     \@tempcntb\@tempcnta
-    \advance\@tempcntb\m@ne
+    \advance\@tempcntb\@ne
     \divide\@tempcntb\tw@
     \@tempcnta\@ne
     \def\@qitempa{}\def\@qitempb{}%
